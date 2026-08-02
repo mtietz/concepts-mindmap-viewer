@@ -1,0 +1,93 @@
+name: macOS App
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    env:
+      APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+
+      - name: Require signing credentials for releases
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          for value in APPLE_CERTIFICATE_BASE64 APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_TEAM_ID APPLE_APP_PASSWORD; do
+            if [[ -z "${!value}" ]]; then
+              echo "Missing required secret: $value" >&2
+              exit 1
+            fi
+          done
+
+      - name: Install build dependencies
+        run: python -m pip install -r requirements-build.txt
+
+      - name: Import Apple signing certificate
+        if: env.APPLE_CERTIFICATE_BASE64 != ''
+        env:
+          KEYCHAIN_PASSWORD: temporary-build-password
+        run: |
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+      - name: Build app
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            export APP_VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          ./scripts/build_macos.sh
+
+      - name: Verify app bundle
+        run: |
+          codesign --verify --deep --strict --verbose=2 "dist/Concepts Mindmap Viewer.app"
+          file "dist/Concepts Mindmap Viewer.app/Contents/MacOS/Concepts Mindmap Viewer" | grep universal
+
+      - name: Create disk image
+        run: |
+          mkdir dmg-root
+          cp -R "dist/Concepts Mindmap Viewer.app" dmg-root/
+          ln -s /Applications dmg-root/Applications
+          hdiutil create -volname "Concepts Mindmap Viewer" -srcfolder dmg-root -ov -format UDZO "Concepts-Mindmap-Viewer.dmg"
+
+      - name: Notarize and staple
+        if: env.APPLE_SIGNING_IDENTITY != ''
+        run: |
+          xcrun notarytool submit "Concepts-Mindmap-Viewer.dmg" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --wait
+          xcrun stapler staple "Concepts-Mindmap-Viewer.dmg"
+          xcrun stapler validate "Concepts-Mindmap-Viewer.dmg"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Concepts-Mindmap-Viewer-macOS
+          path: Concepts-Mindmap-Viewer.dmg
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "Concepts-Mindmap-Viewer.dmg" --generate-notes --verify-tag

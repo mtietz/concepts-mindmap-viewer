@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Concepts Mindmaps</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <header>
+      <p class="eyebrow">CONCEPTS</p>
+      <h1>Mindmaps</h1>
+      <p id="source" class="source"></p>
+    </header>
+    <label class="search">
+      <span>⌕</span>
+      <input id="search" type="search" placeholder="Search mindmaps…" autocomplete="off">
+    </label>
+    <div id="documents" class="documents"></div>
+  </aside>
+
+  <main>
+    <nav class="toolbar">
+      <div class="toolbar-leading">
+        <button id="sidebar-toggle" aria-label="Toggle mindmap sidebar" title="Show or hide mindmaps (⌘B)">☰</button>
+        <div class="title-block">
+          <strong id="title">Loading…</strong>
+          <span id="meta"></span>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="choose-folder" title="Choose the Concepts folder" hidden>Folder…</button>
+        <button id="reveal" title="Show the document in Finder">Finder</button>
+        <span class="separator"></span>
+        <button id="rotate-left" aria-label="Rotate counterclockwise" title="Rotate counterclockwise">↶</button>
+        <output id="rotation" title="Click to reset rotation">0°</output>
+        <button id="rotate-right" aria-label="Rotate clockwise" title="Rotate clockwise">↷</button>
+        <span class="separator"></span>
+        <button id="zoom-out" aria-label="Zoom out">−</button>
+        <output id="zoom">100%</output>
+        <button id="zoom-in" aria-label="Zoom in">+</button>
+        <button id="fit">Fit</button>
+      </div>
+    </nav>
+    <section id="stage" class="stage">
+      <div id="empty" class="empty">No mindmap selected</div>
+      <img id="mindmap" alt="Mindmap preview" draggable="false">
+    </section>
+    <div class="hint">Scroll to zoom · Drag to move · [ / ] to rotate · Double-click to fit</div>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
