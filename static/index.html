@@ -30,6 +30,7 @@
         </div>
       </div>
       <div class="actions">
+        <button id="refresh" aria-label="Refresh mindmaps" title="Refresh mindmaps">↻</button>
         <button id="choose-folder" title="Choose the Concepts folder" hidden>Folder…</button>
         <button id="reveal" title="Show the document in Finder">Finder</button>
         <span class="separator"></span>
@@ -44,11 +45,34 @@
       </div>
     </nav>
     <section id="stage" class="stage">
-      <div id="empty" class="empty">No mindmap selected</div>
+      <div id="empty" class="empty">
+        <div class="empty-content">
+          <strong id="empty-title">No mindmap selected</strong>
+          <span id="empty-message"></span>
+          <button id="empty-choose-folder" hidden>Choose folder…</button>
+        </div>
+      </div>
       <img id="mindmap" alt="Mindmap preview" draggable="false">
     </section>
     <div class="hint">Scroll to zoom · Drag to move · [ / ] to rotate · Double-click to fit</div>
   </main>
+
+  <dialog id="onboarding" aria-labelledby="onboarding-title">
+    <div class="onboarding-icon" aria-hidden="true">⌘</div>
+    <p class="eyebrow">WELCOME</p>
+    <h2 id="onboarding-title">Your mindmaps, always in sync</h2>
+    <p>Store your Concepts mindmap folder in a cloud-synced location such as iCloud Drive, then choose that same folder here.</p>
+    <ol>
+      <li>Set the mindmap location in Concepts to an iCloud Drive or other cloud folder.</li>
+      <li>Choose that folder in Concepts Mindmap Viewer.</li>
+      <li>New and changed mindmaps appear automatically.</li>
+    </ol>
+    <p class="privacy-note">The viewer reads files locally and never modifies or uploads them. Your cloud provider handles synchronization.</p>
+    <div class="dialog-actions">
+      <button id="onboarding-later">Not now</button>
+      <button id="onboarding-choose" class="primary">Choose folder…</button>
+    </div>
+  </dialog>
 
   <script src="/app.js"></script>
 </body>

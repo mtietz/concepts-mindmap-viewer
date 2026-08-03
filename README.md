@@ -5,12 +5,17 @@ A private, local macOS viewer for [Concepts](https://concepts.app/) `.concept` d
 > [!NOTE]
 > This is an independent, unofficial project. It is not affiliated with or endorsed by TopHatch or Concepts.
 
+> [!TIP]
+> **Keep your mindmaps synchronized:** On every device where you use Concepts, place the Concepts mindmap directory in a cloud-synced folder such as iCloud Drive. Then select that same cloud folder in Concepts Mindmap Viewer. Your cloud provider keeps the `.concept` files synchronized, while the viewer notices new and changed mindmaps automatically. Make sure cloud files are downloaded on the Mac before opening them.
+
 ## Features
 
 - Runs as a regular macOS application—no Terminal or separate browser required
 - Uses a native folder picker and remembers your Concepts directory
 - Renders strokes from a `.concept` archive as a full-canvas SVG
 - Scans directories recursively and provides a searchable document list
+- Detects new, changed, and removed mindmaps automatically
+- Includes first-launch guidance and actionable empty states
 - Supports pan, zoom, fit-to-window, and 90° rotation
 - Reveals the source document in Finder
 - Processes documents locally and never modifies or uploads them
@@ -20,7 +25,7 @@ A private, local macOS viewer for [Concepts](https://concepts.app/) `.concept` d
 
 Signed and notarized universal builds for macOS 14 or later will be available from [GitHub Releases](https://github.com/mtietz/concepts-mindmap-viewer/releases). Download the DMG, drag **Concepts Mindmap Viewer** into Applications, and open it normally.
 
-On first launch, choose the folder containing your `.concept` documents. Use **Folder…** in the toolbar whenever you want to change it. The selection is saved in:
+On first launch, the app explains how to use a synchronized Concepts folder and lets you choose the directory containing your `.concept` documents. Use **Folder…** in the toolbar whenever you want to change it. The selection is saved in:
 
 ```text
 ~/Library/Application Support/Concepts Mindmap Viewer/settings.json
@@ -39,6 +44,7 @@ Until the first signed release is published, developers can [build the app local
 | Action | Control |
 | --- | --- |
 | Choose Concepts directory | **Folder…** |
+| Refresh immediately | **↻** |
 | Show or hide sidebar | **☰** or **Command-B** |
 | Zoom | Scroll, **+**, or **−** |
 | Pan | Drag the canvas |

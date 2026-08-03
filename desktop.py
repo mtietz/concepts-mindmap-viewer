@@ -87,14 +87,8 @@ def main() -> int:
     )
     api.window = window
 
-    def on_started() -> None:
-        if configured_source is None:
-            selection = api.choose_folder()
-            if selection is not None:
-                window.load_url(url)
-
     try:
-        webview.start(on_started)
+        webview.start()
     finally:
         server.shutdown()
         server.server_close()
