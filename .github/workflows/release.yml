@@ -70,6 +70,12 @@ jobs:
           ln -s /Applications dmg-root/Applications
           hdiutil create -volname "Concepts Mindmap Viewer" -srcfolder dmg-root -ov -format UDZO "Concepts-Mindmap-Viewer.dmg"
 
+      - name: Sign disk image
+        if: env.APPLE_SIGNING_IDENTITY != ''
+        run: |
+          codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "Concepts-Mindmap-Viewer.dmg"
+          codesign --verify --strict --verbose=2 "Concepts-Mindmap-Viewer.dmg"
+
       - name: Notarize and staple
         if: env.APPLE_SIGNING_IDENTITY != ''
         run: |
