@@ -6,7 +6,13 @@ const zoomOutput = document.querySelector('#zoom');
 const documentList = document.querySelector('#documents');
 const search = document.querySelector('#search');
 const sidebarToggle = document.querySelector('#sidebar-toggle');
+const refreshButton = document.querySelector('#refresh');
 const chooseFolderButton = document.querySelector('#choose-folder');
+const emptyChooseFolderButton = document.querySelector('#empty-choose-folder');
+const empty = document.querySelector('#empty');
+const emptyTitle = document.querySelector('#empty-title');
+const emptyMessage = document.querySelector('#empty-message');
+const onboarding = document.querySelector('#onboarding');
 
 if (localStorage.getItem('mindmap-sidebar-collapsed') === 'true') {
   document.body.classList.add('sidebar-collapsed');
@@ -22,6 +28,8 @@ let rotation = 0;
 let x = 0;
 let y = 0;
 let drag = null;
+let refreshInFlight = false;
+let desktopAvailable = false;
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const formatSize = bytes => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -89,6 +97,13 @@ function rotateBy(degrees) {
   renderTransform();
 }
 
+function setEmpty(titleText, message = '', showFolderButton = false) {
+  emptyTitle.textContent = titleText;
+  emptyMessage.textContent = message;
+  emptyChooseFolderButton.hidden = !(showFolderButton && desktopAvailable);
+  empty.hidden = false;
+}
+
 function renderList(filter = '') {
   const term = filter.trim().toLocaleLowerCase();
   const matches = documents.filter(doc =>
@@ -96,7 +111,7 @@ function renderList(filter = '') {
   );
   documentList.replaceChildren(...matches.map(doc => {
     const button = document.createElement('button');
-    button.className = `document${current?.id === doc.id ? ' active' : ''}`;
+    button.className = `document${current?.path === doc.path ? ' active' : ''}`;
     button.innerHTML = `<strong></strong><small></small>`;
     button.querySelector('strong').textContent = doc.name;
     button.querySelector('small').textContent = doc.relativePath;
@@ -111,18 +126,89 @@ function selectDocument(doc) {
   title.textContent = doc.name;
   meta.textContent = `${doc.relativePath} · ${formatSize(doc.size)}`;
   image.style.visibility = 'hidden';
-  document.querySelector('#empty').textContent = 'Rendering the full mindmap…';
-  document.querySelector('#empty').hidden = false;
+  setEmpty('Rendering the full mindmap…');
   image.onload = () => {
-    document.querySelector('#empty').hidden = true;
+    empty.hidden = true;
     image.style.visibility = 'visible';
     fit();
   };
   image.onerror = () => {
-    document.querySelector('#empty').textContent = 'This document has no readable preview.';
+    setEmpty(
+      'This mindmap could not be rendered',
+      'Make sure the file is downloaded from the cloud and readable.'
+    );
   };
   image.src = `/api/render?id=${doc.id}&t=${doc.modified}`;
   renderList(search.value);
+}
+
+async function loadDocuments({ refresh = false, initial = false } = {}) {
+  if (refreshInFlight) return;
+  refreshInFlight = true;
+  if (refresh) refreshButton.classList.add('refreshing');
+
+  try {
+    const previous = current;
+    const response = await fetch(`/api/documents${refresh ? '?refresh=1' : ''}`);
+    if (!response.ok) throw new Error(`Request failed (${response.status})`);
+    const data = await response.json();
+    documents = data.documents;
+    document.querySelector('#source').textContent = data.source;
+    document.querySelector('#source').title = data.source;
+
+    if (!documents.length) {
+      current = null;
+      image.removeAttribute('src');
+      image.style.visibility = 'hidden';
+      title.textContent = 'No Concepts documents found';
+      meta.textContent = desktopAvailable ? 'Choose another folder.' : data.source;
+      setEmpty(
+        'No mindmaps in this folder',
+        'Choose a folder containing .concept files. Cloud files may need to finish downloading.',
+        true
+      );
+      renderList(search.value);
+      return;
+    }
+
+    const replacement = previous
+      ? documents.find(doc => doc.path === previous.path)
+      : null;
+
+    if (!replacement) {
+      selectDocument(documents[0]);
+      return;
+    }
+
+    const documentChanged = replacement.modified !== previous.modified || replacement.size !== previous.size;
+    current = replacement;
+    title.textContent = replacement.name;
+    meta.textContent = `${replacement.relativePath} · ${formatSize(replacement.size)}`;
+    renderList(search.value);
+    if (documentChanged) selectDocument(replacement);
+  } catch (error) {
+    if (initial || !documents.length) {
+      title.textContent = 'Could not load documents';
+      meta.textContent = error.message;
+      setEmpty('Could not read this folder', 'Check that the folder is available and try again.', true);
+    }
+  } finally {
+    refreshInFlight = false;
+    refreshButton.classList.remove('refreshing');
+  }
+}
+
+async function chooseFolder() {
+  if (!desktopAvailable) return;
+  chooseFolderButton.disabled = true;
+  emptyChooseFolderButton.disabled = true;
+  try {
+    const selection = await window.pywebview.api.choose_folder();
+    if (selection) await loadDocuments({ refresh: true });
+  } finally {
+    chooseFolderButton.disabled = false;
+    emptyChooseFolderButton.disabled = false;
+  }
 }
 
 stage.addEventListener('wheel', event => {
@@ -131,7 +217,7 @@ stage.addEventListener('wheel', event => {
 }, { passive: false });
 
 stage.addEventListener('pointerdown', event => {
-  if (event.button !== 0) return;
+  if (event.button !== 0 || event.target.closest('button')) return;
   drag = { clientX: event.clientX, clientY: event.clientY, x, y };
   stage.classList.add('dragging');
   stage.setPointerCapture(event.pointerId);
@@ -160,9 +246,7 @@ sidebarToggle.addEventListener('click', toggleSidebar);
 
 document.querySelector('#rotate-left').addEventListener('click', () => rotateBy(-90));
 document.querySelector('#rotate-right').addEventListener('click', () => rotateBy(90));
-document.querySelector('#rotation').addEventListener('click', () => {
-  rotateBy(-rotation);
-});
+document.querySelector('#rotation').addEventListener('click', () => rotateBy(-rotation));
 document.addEventListener('keydown', event => {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
     event.preventDefault();
@@ -186,38 +270,37 @@ document.querySelector('#fit').addEventListener('click', fit);
 document.querySelector('#reveal').addEventListener('click', () => {
   if (current) fetch(`/api/reveal?id=${current.id}`);
 });
+refreshButton.addEventListener('click', () => loadDocuments({ refresh: true }));
+chooseFolderButton.addEventListener('click', chooseFolder);
+emptyChooseFolderButton.addEventListener('click', chooseFolder);
 
 window.addEventListener('pywebviewready', () => {
+  desktopAvailable = true;
   chooseFolderButton.hidden = false;
-});
-chooseFolderButton.addEventListener('click', async () => {
-  chooseFolderButton.disabled = true;
-  try {
-    const selection = await window.pywebview.api.choose_folder();
-    if (selection) window.location.reload();
-  } finally {
-    chooseFolderButton.disabled = false;
+  if (!documents.length) emptyChooseFolderButton.hidden = false;
+
+  if (localStorage.getItem('concepts-onboarding-seen') !== 'true') {
+    onboarding.showModal();
   }
 });
+
+document.querySelector('#onboarding-later').addEventListener('click', () => {
+  localStorage.setItem('concepts-onboarding-seen', 'true');
+  onboarding.close();
+});
+document.querySelector('#onboarding-choose').addEventListener('click', async () => {
+  localStorage.setItem('concepts-onboarding-seen', 'true');
+  onboarding.close();
+  await chooseFolder();
+});
+
 search.addEventListener('input', () => renderList(search.value));
 window.addEventListener('resize', fit);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) loadDocuments({ refresh: true });
+});
+setInterval(() => {
+  if (!document.hidden) loadDocuments({ refresh: true });
+}, 10000);
 
-fetch('/api/documents')
-  .then(response => response.json())
-  .then(data => {
-    documents = data.documents;
-    document.querySelector('#source').textContent = data.source;
-    document.querySelector('#source').title = data.source;
-    renderList();
-    if (documents.length) {
-      selectDocument(documents[0]);
-    } else {
-      title.textContent = 'No Concepts documents found';
-      meta.textContent = 'Choose another folder from the toolbar.';
-      document.querySelector('#empty').textContent = 'This folder contains no .concept documents.';
-    }
-  })
-  .catch(error => {
-    title.textContent = 'Could not load documents';
-    meta.textContent = error.message;
-  });
+loadDocuments({ initial: true });

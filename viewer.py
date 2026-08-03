@@ -168,6 +168,17 @@ class DocumentCatalog:
             SVG_CACHE.clear()
         return list(documents)
 
+    def refresh(self) -> list[Path]:
+        """Rescan the current source without changing the selected directory."""
+        with self._lock:
+            source = self._source
+        documents = find_documents(source)
+        with self._lock:
+            # Do not let a slower scan overwrite a directory selected meanwhile.
+            if source == self._source:
+                self._documents = documents
+            return list(self._documents)
+
     def snapshot(self) -> tuple[Path, list[Path]]:
         with self._lock:
             return self._source, list(self._documents)
@@ -213,11 +224,16 @@ def make_handler(catalog: DocumentCatalog):
             query = urllib.parse.parse_qs(parsed.query)
 
             if parsed.path == "/api/documents":
+                if query.get("refresh") == ["1"]:
+                    catalog.refresh()
                 items = []
                 source, documents = catalog.snapshot()
                 base = source if source.is_dir() else source.parent
                 for index, path in enumerate(documents):
-                    stat = path.stat()
+                    try:
+                        stat = path.stat()
+                    except OSError:
+                        continue
                     try:
                         relative = str(path.relative_to(base))
                     except ValueError:

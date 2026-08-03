@@ -53,6 +53,21 @@ class DocumentCatalogTests(unittest.TestCase):
             self.assertEqual(source, Path(second).resolve())
             self.assertEqual(documents, [second_document.resolve()])
 
+    def test_refresh_detects_added_and_removed_documents(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            original = root / "original.concept"
+            original.touch()
+            catalog = viewer.DocumentCatalog(root)
+
+            added = root / "added.concept"
+            added.touch()
+            original.unlink()
+            documents = catalog.refresh()
+
+            self.assertEqual(documents, [added.resolve()])
+            self.assertEqual(catalog.document(0), added.resolve())
+
 
 class DesktopSettingsTests(unittest.TestCase):
     def test_saves_and_loads_selected_source(self):
